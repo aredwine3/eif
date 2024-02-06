@@ -1,15 +1,15 @@
 # Cython wrapper for Extended Isolation Forest
 
-# distutils: language = C++
+# distutils: language = c++
 # distutils: sources  = eif.cxx
 # cython: language_level = 3
 
 import cython
 import numpy as np
 cimport numpy as np
+from libc.stdlib cimport malloc, free
+from __eif cimport iForest as cpp_iForest 
 from version import __version__
-
-cimport __eif
 
 np.import_array()
 
@@ -21,14 +21,17 @@ cdef class iForest:
     cdef int sample
     cdef int tree_index
     cdef int exlevel
-    cdef __eif.iForest* thisptr
+    #cdef __eif.iForest* thisptr
+    cdef cpp_iForest* thisptr  # Use the C++ class
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__ (self, np.ndarray[double, ndim=2] X not None, int ntrees, int sample_size, int limit=0, int ExtensionLevel=0, int seed=-1):
         if ExtensionLevel < 0:
             raise Exception("Wrong Extension")
-        self.thisptr = new __eif.iForest (ntrees, sample_size, limit, ExtensionLevel, seed)
+        #self.thisptr = new __eif.iForest (ntrees, sample_size, limit, ExtensionLevel, seed)
+        self.thisptr = <cpp_iForest*> malloc(sizeof(cpp_iForest))  # Use malloc for memory allocation
+        self.thisptr[0] = cpp_iForest(ntrees, sample_size, limit, ExtensionLevel, seed)  # Initialize 
         if not X.flags['C_CONTIGUOUS']:
             X = X.copy(order='C')
         self.size_X = X.shape[0]
@@ -48,7 +51,9 @@ cdef class iForest:
         return self._limit
 
     def __dealloc__ (self):
-        del self.thisptr
+        #del self.thisptr
+        if self.thisptr != NULL:
+            free(self.thisptr) # Deallocate memory
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
